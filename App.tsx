@@ -1,7 +1,7 @@
 import { StatusBar } from "expo-status-bar";
 import { StyleSheet, Text, View, Dimensions, Platform } from "react-native";
 import React, { useEffect, useRef, useState } from "react";
-import Svg, { Circle } from "react-native-svg";
+import Svg, { Circle, Line } from "react-native-svg";
 
 import { Camera } from "expo-camera";
 import * as ScreenOrientation from "expo-screen-orientation";
@@ -14,6 +14,7 @@ import {
   bundleResourceIO,
   cameraWithTensors,
 } from "@tensorflow/tfjs-react-native";
+import * as posenet from "@tensorflow-models/posenet";
 
 const TensorCamera = cameraWithTensors(Camera);
 
@@ -48,6 +49,7 @@ export default function App() {
   const [orientation, setOrientation] =
     useState<ScreenOrientation.Orientation>();
   const [cameraType, setCameraType] = useState<CameraType>(CameraType.front);
+  const [debugMode, setDebugMode] = useState(true);
   // Using 'useRef' so that changing it won't trigger a re-render
   // - null: unset (initial value)
   // - 0: animation frame/loop has been canceled
@@ -75,7 +77,7 @@ export default function App() {
 
       // Load movenet model
       const movenetModelConfig: posedetection.MoveNetModelConfig = {
-        modelType: posedetection.movenet.modelType.SINGLEPOSE_THUNDER,
+        modelType: posedetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
       };
 
       // If model is stored on local device
@@ -95,6 +97,7 @@ export default function App() {
         posedetection.SupportedModels.MoveNet,
         movenetModelConfig
       );
+
       setModel(model);
 
       // Tensorflow is ready!
@@ -143,13 +146,13 @@ export default function App() {
     loop();
   };
 
-  const renderPose = () => {
+  const renderKeypoints = () => {
     if (poses != null && poses.length > 0) {
       const keypoints = poses[0].keypoints
         .filter((k) => (k.score ?? 0) > MIN_KEYPOINT_SCORE)
         .map((k, i) => {
           // Flip horizontally on android or when using back camera on iOS
-          const flipX = IS_ANDROID || cameraType === CameraType.front;
+          const flipX = IS_ANDROID || cameraType === CameraType.back;
           const x = flipX ? getOutputTensorWidth() - k.x : k.x;
           const y = k.y;
           const cx =
@@ -170,10 +173,56 @@ export default function App() {
             />
           );
         });
+      //console.log(keypoints);
       return <Svg style={styles.svg}>{keypoints}</Svg>;
     } else {
       return <View></View>;
     }
+  };
+
+  const renderSkeleton = (minConfidence = MIN_KEYPOINT_SCORE) => {
+    const skeleton: React.ReactElement[] = [];
+    if (poses != null && poses.length > 0) {
+      const keypoints = poses[0].keypoints;
+      posedetection.util
+        .getAdjacentPairs(posedetection.SupportedModels.MoveNet)
+        .forEach(([i, j]) => {
+          const kp1 = keypoints[i];
+          const kp2 = keypoints[j];
+
+          // If score is null just show the keypoint
+          const score1 = kp1.score != null ? kp1.score : 1;
+          const score2 = kp2.score != null ? kp2.score : 1;
+
+          if (score1 >= minConfidence && score2 >= minConfidence) {
+            // TODO: Function to calculate cx and cy
+            const cx1 =
+              (kp1.x / getOutputTensorWidth()) *
+              (isPortrait() ? CAM_PREVIEW_WIDTH : CAM_PREVIEW_HEIGHT);
+            const cy1 =
+              (kp1.y / getOutputTensorHeight()) *
+              (isPortrait() ? CAM_PREVIEW_HEIGHT : CAM_PREVIEW_WIDTH);
+            const cx2 =
+              (kp2.x / getOutputTensorWidth()) *
+              (isPortrait() ? CAM_PREVIEW_WIDTH : CAM_PREVIEW_HEIGHT);
+            const cy2 =
+              (kp2.y / getOutputTensorHeight()) *
+              (isPortrait() ? CAM_PREVIEW_HEIGHT : CAM_PREVIEW_WIDTH);
+            skeleton.push(
+              <Line
+                key={`skeletonline_${kp1.name}-${kp2.name}`}
+                x1={cx1}
+                x2={cx2}
+                y1={cy1}
+                y2={cy2}
+                stroke="red"
+                strokeWidth="2"
+              />
+            );
+          }
+        });
+    }
+    return <Svg style={styles.svg}>{skeleton}</Svg>;
   };
 
   const renderFps = () => {
@@ -191,8 +240,16 @@ export default function App() {
         onTouchEnd={handleSwitchCameraType}
       >
         <Text>
-          Switch to {cameraType === CameraType.front ? "back" : "front"} camera
+          Switch to {cameraType === CameraType.front ? "back" : "front"}
         </Text>
+      </View>
+    );
+  };
+
+  const renderDebugModeSwitcher = () => {
+    return (
+      <View style={styles.debugModeSwitcher} onTouchEnd={handleSwitchDebugMode}>
+        <Text>Debug {debugMode ? "ON" : "OFF"}</Text>
       </View>
     );
   };
@@ -202,6 +259,14 @@ export default function App() {
       setCameraType(CameraType.back);
     } else {
       setCameraType(CameraType.front);
+    }
+  };
+
+  const handleSwitchDebugMode = () => {
+    if (debugMode) {
+      setDebugMode(false);
+    } else {
+      setDebugMode(true);
     }
   };
 
@@ -284,8 +349,12 @@ export default function App() {
           cameraTextureHeight={CAM_PREVIEW_HEIGHT}
           resizeDepth={3}
         />
-        {renderPose()}
+
+        {debugMode && renderKeypoints()}
+        {debugMode && renderSkeleton()}
+
         {renderFps()}
+        {renderDebugModeSwitcher()}
         {renderCameraTypeSwitcher()}
       </View>
     );
@@ -338,7 +407,18 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 10,
     right: 10,
-    width: 180,
+    width: 100,
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, .7)",
+    borderRadius: 2,
+    padding: 8,
+    zIndex: 20,
+  },
+  debugModeSwitcher: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    width: 160,
     alignItems: "center",
     backgroundColor: "rgba(255, 255, 255, .7)",
     borderRadius: 2,
