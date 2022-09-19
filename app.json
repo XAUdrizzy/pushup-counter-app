@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Pushup",
-    "slug": "Pushup",
+    "name": "pushup-counter",
+    "slug": "pushup-counter",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

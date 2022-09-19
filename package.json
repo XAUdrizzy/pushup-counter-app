@@ -1,5 +1,5 @@
 {
-  "name": "pushup",
+  "name": "pushup-counter",
   "version": "1.0.0",
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
@@ -9,19 +9,30 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@mediapipe/pose": "^0.5.1635988162",
+    "@react-native-async-storage/async-storage": "~1.17.3",
+    "@tensorflow-models/pose-detection": "^2.0.0",
     "@tensorflow-models/posenet": "^2.2.2",
     "@tensorflow/tfjs": "^3.20.0",
+    "@tensorflow/tfjs-react-native": "^0.8.0",
     "expo": "~46.0.9",
-    "expo-2d-context": "^0.0.3",
     "expo-camera": "~12.3.0",
     "expo-gl": "~11.4.0",
+    "expo-gl-cpp": "~11.4.0",
+    "expo-screen-orientation": "~4.3.0",
     "expo-status-bar": "~1.4.0",
     "react": "18.0.0",
+    "react-dom": "18.0.0",
     "react-native": "0.69.5",
-    "react-native-webview": "11.23.0"
+    "react-native-fs": "^2.20.0",
+    "react-native-svg": "^12.3.0",
+    "react-native-web": "~0.18.7"
   },
   "devDependencies": {
-    "@babel/core": "^7.12.9"
+    "@babel/core": "^7.12.9",
+    "@types/react": "~18.0.14",
+    "@types/react-native": "~0.69.1",
+    "typescript": "~4.3.5"
   },
   "private": true
 }
