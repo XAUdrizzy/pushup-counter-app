@@ -122,7 +122,7 @@ export default function App() {
     gl: ExpoWebGLRenderingContext
   ) => {
     const loop = async () => {
-      const imageTensor = images.next().value as tf.Tensor3D;
+      const imageTensor = tf.reverse(images.next().value as tf.Tensor3D,1);
 
       const startTs = Date.now();
       const poses = await model!.estimatePoses(imageTensor);
@@ -150,17 +150,13 @@ export default function App() {
     if (poses != null && poses.length > 0) {
       const keypoints = poses[0].keypoints
         .filter((k) => (k.score ?? 0) > MIN_KEYPOINT_SCORE)
-        .map((k, i) => {
+        .map((k) => {
           // Flip horizontally on android or when using back camera on iOS
           const flipX = IS_ANDROID || cameraType === CameraType.back;
           const x = flipX ? getOutputTensorWidth() - k.x : k.x;
           const y = k.y;
-          const cx =
-            (x / getOutputTensorWidth()) *
-            (isPortrait() ? CAM_PREVIEW_WIDTH : CAM_PREVIEW_HEIGHT);
-          const cy =
-            (y / getOutputTensorHeight()) *
-            (isPortrait() ? CAM_PREVIEW_HEIGHT : CAM_PREVIEW_WIDTH);
+          const cx = translateX(x);
+          const cy = translateY(y);
           return (
             <Circle
               key={`skeletonkp_${k.name}`}
@@ -195,19 +191,10 @@ export default function App() {
           const score2 = kp2.score != null ? kp2.score : 1;
 
           if (score1 >= minConfidence && score2 >= minConfidence) {
-            // TODO: Function to calculate cx and cy
-            const cx1 =
-              (kp1.x / getOutputTensorWidth()) *
-              (isPortrait() ? CAM_PREVIEW_WIDTH : CAM_PREVIEW_HEIGHT);
-            const cy1 =
-              (kp1.y / getOutputTensorHeight()) *
-              (isPortrait() ? CAM_PREVIEW_HEIGHT : CAM_PREVIEW_WIDTH);
-            const cx2 =
-              (kp2.x / getOutputTensorWidth()) *
-              (isPortrait() ? CAM_PREVIEW_WIDTH : CAM_PREVIEW_HEIGHT);
-            const cy2 =
-              (kp2.y / getOutputTensorHeight()) *
-              (isPortrait() ? CAM_PREVIEW_HEIGHT : CAM_PREVIEW_WIDTH);
+            const cx1 = translateX(kp1.x);
+            const cy1 = translateY(kp1.y);
+            const cx2 = translateX(kp2.x);
+            const cy2 = translateY(kp2.y);
             skeleton.push(
               <Line
                 key={`skeletonline_${kp1.name}-${kp2.name}`}
@@ -277,6 +264,17 @@ export default function App() {
     );
   };
 
+  const translateX = (x: number): number => {
+    return (x / getOutputTensorWidth()) *
+    (isPortrait() ? CAM_PREVIEW_WIDTH : CAM_PREVIEW_HEIGHT);
+  }
+
+  const translateY = (y: number): number => {
+    return (y / getOutputTensorHeight()) *
+    (isPortrait() ? CAM_PREVIEW_HEIGHT: CAM_PREVIEW_WIDTH);
+ 
+  }
+
   const getOutputTensorWidth = () => {
     // On iOS landscape mode, switch width and height of the output tensor
     // to get a better result. Without this it would stretch the image too much
@@ -302,7 +300,6 @@ export default function App() {
       return 0;
     }
 
-    /*
     // For iOS the camera texture won't rotate automatically.
     // Calculate rotation angles to rotate TensorCamera internally
     switch (orientation) {
@@ -316,7 +313,6 @@ export default function App() {
       default:
         return 0;
     }
-    */
   };
 
   if (!tfReady) {
